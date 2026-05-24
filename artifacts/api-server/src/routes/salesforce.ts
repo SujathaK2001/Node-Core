@@ -186,11 +186,31 @@ router.get("/login", (req, res) => {
 });
 
 router.get("/callback", async (req, res) => {
-  const code = req.query["code"] as string;
-  if (!code) {
-    res.send("Missing authorization code");
+  res.setHeader("Cache-Control", "no-store");
+
+  const sfError = req.query["error"] as string | undefined;
+  const sfErrorDesc = req.query["error_description"] as string | undefined;
+  if (sfError) {
+    req.log.error({ sfError, sfErrorDesc }, "Salesforce OAuth error");
+    res.send(`
+      <h2>Salesforce Login Error</h2>
+      <p><strong>Error:</strong> ${sfError}</p>
+      <p><strong>Description:</strong> ${sfErrorDesc ?? "none"}</p>
+      <p><a href="/api">Back</a></p>
+    `);
     return;
   }
+
+  const code = req.query["code"] as string;
+  if (!code) {
+    res.send(`
+      <h2>Missing Authorization Code</h2>
+      <p>Salesforce did not return a code. Full query: <code>${JSON.stringify(req.query)}</code></p>
+      <p><a href="/api">Back</a></p>
+    `);
+    return;
+  }
+
   const redirectUri = getRedirectUri(req);
   try {
     const response = await axios.post(TOKEN_URL, null, {
@@ -209,7 +229,11 @@ router.get("/callback", async (req, res) => {
   } catch (error: unknown) {
     const err = error as { response?: { data?: unknown }; message?: string };
     req.log.error({ err: err.response?.data || err.message }, "OAuth callback error");
-    res.send(`Login Failed: ${JSON.stringify(err.response?.data || err.message)}`);
+    res.send(`
+      <h2>Token Exchange Failed</h2>
+      <pre>${JSON.stringify(err.response?.data || err.message, null, 2)}</pre>
+      <p><a href="/api">Back</a></p>
+    `);
   }
 });
 
