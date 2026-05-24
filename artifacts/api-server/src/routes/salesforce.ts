@@ -82,6 +82,7 @@ router.get("/", (_req, res) => {
     <div class="toolbar">
       <input type="text" id="objectFilter" placeholder="Filter by object (e.g. Account)" oninput="filterRules()" />
       <button onclick="fetchRules()">Refresh</button>
+      <button onclick="exportCSV()" style="background:#2e844a">Export CSV</button>
       <button onclick="loginSalesforce()" style="background:#6c757d">Re-login</button>
     </div>
     <table>
@@ -172,6 +173,30 @@ router.get("/", (_req, res) => {
           </td>
         </tr>
       \`).join("");
+    }
+
+    function exportCSV() {
+      if (!allRules.length) {
+        setStatus("No rules to export.", "error");
+        return;
+      }
+      const rows = [["Rule Name", "Object ID", "Active", "Error Message"]];
+      allRules.forEach(rule => {
+        rows.push([
+          rule.ValidationName,
+          rule.EntityDefinitionId || "",
+          rule.Active ? "Active" : "Inactive",
+          rule.ErrorMessage || ""
+        ]);
+      });
+      const csv = rows.map(r => r.map(v => \`"\${String(v).replace(/"/g, '""')}"\`).join(",")).join("\\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "validation_rules.csv";
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     async function toggleRule(id, currentlyActive) {
