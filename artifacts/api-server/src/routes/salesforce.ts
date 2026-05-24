@@ -316,7 +316,7 @@ router.post("/toggleRule/:id", async (req, res) => {
     const url = `${instanceUrl}/services/data/v60.0/tooling/sobjects/ValidationRule/${id}`;
     await axios.patch(
       url,
-      { Metadata: { active } },
+      { Active: active },
       { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
     );
     res.json({ success: true });
