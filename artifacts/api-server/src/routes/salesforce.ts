@@ -99,7 +99,7 @@ router.get("/", (_req, res) => {
     let allRules = [];
 
     function loginSalesforce() {
-      window.location.href = "/api/login";
+      window.open("/api/login", "_blank", "width=600,height=700");
     }
 
     function setStatus(msg, type) {
@@ -239,7 +239,16 @@ router.get("/callback", async (req, res) => {
     });
     accessToken = response.data.access_token;
     instanceUrl = response.data.instance_url;
-    res.redirect("/api");
+    res.send(`
+      <!DOCTYPE html><html><body style="font-family:Arial;text-align:center;padding:60px">
+        <h2 style="color:#2e844a">✅ Login Successful!</h2>
+        <p>You are now connected to Salesforce.</p>
+        <p>Close this window and <strong>refresh the main app</strong> to see your validation rules.</p>
+        <script>
+          setTimeout(() => { window.close(); }, 2000);
+        </script>
+      </body></html>
+    `);
   } catch (error: unknown) {
     const err = error as { response?: { data?: unknown }; message?: string };
     req.log.error({ err: err.response?.data || err.message }, "OAuth callback error");
