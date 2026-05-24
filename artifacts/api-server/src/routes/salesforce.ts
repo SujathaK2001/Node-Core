@@ -31,7 +31,7 @@ let instanceUrl = "";
 let storedCodeVerifier = "";
 
 router.get("/", (_req, res) => {
-  const isLoggedIn = !!accessToken;
+  res.setHeader("Cache-Control", "no-store");
   res.send(`<!DOCTYPE html>
 <html>
 <head>
@@ -65,41 +65,60 @@ router.get("/", (_req, res) => {
     #status.info { background: #e8f4fd; color: #014486; display: block; }
     #status.error { background: #fce8e8; color: #c23934; display: block; }
     .login-prompt { text-align: center; padding: 40px; background: white; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+    #tableSection { display: none; }
+    #loginSection { display: block; }
   </style>
 </head>
 <body>
   <h2>Salesforce Validation Rules</h2>
   <div id="status"></div>
 
-  ${isLoggedIn ? `
-  <div class="toolbar">
-    <input type="text" id="objectFilter" placeholder="Filter by object (e.g. Account)" oninput="filterRules()" />
-    <button onclick="fetchRules()">Refresh</button>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th>Rule Name</th>
-        <th>Object</th>
-        <th>Active</th>
-        <th>Error Message</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="tableBody"><tr><td colspan="5" style="text-align:center;color:#888">Loading...</td></tr></tbody>
-  </table>
-  ` : `
-  <div class="login-prompt">
+  <div id="loginSection" class="login-prompt">
     <p style="font-size:16px;color:#555;margin-bottom:20px;">Connect your Salesforce org to view and manage Validation Rules.</p>
     <button onclick="loginSalesforce()">Login with Salesforce</button>
   </div>
-  `}
+
+  <div id="tableSection">
+    <div class="toolbar">
+      <input type="text" id="objectFilter" placeholder="Filter by object (e.g. Account)" oninput="filterRules()" />
+      <button onclick="fetchRules()">Refresh</button>
+      <button onclick="loginSalesforce()" style="background:#6c757d">Re-login</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Rule Name</th>
+          <th>Object</th>
+          <th>Active</th>
+          <th>Error Message</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"><tr><td colspan="5" style="text-align:center;color:#888">Loading...</td></tr></tbody>
+    </table>
+  </div>
 
   <script>
     let allRules = [];
 
     function loginSalesforce() {
-      window.open("/api/login", "_blank", "width=600,height=700");
+      const popup = window.open("/api/login", "_blank", "width=600,height=700");
+      const timer = setInterval(() => {
+        if (popup && popup.closed) {
+          clearInterval(timer);
+          fetchRules();
+        }
+      }, 500);
+    }
+
+    function showLoginPrompt() {
+      document.getElementById("loginSection").style.display = "block";
+      document.getElementById("tableSection").style.display = "none";
+    }
+
+    function showTable() {
+      document.getElementById("loginSection").style.display = "none";
+      document.getElementById("tableSection").style.display = "block";
     }
 
     function setStatus(msg, type) {
@@ -112,13 +131,19 @@ router.get("/", (_req, res) => {
       setStatus("Loading validation rules...", "info");
       try {
         const response = await fetch("/api/validationRules");
-        if (!response.ok) throw new Error("Not authenticated");
+        if (response.status === 401) {
+          setStatus("Session expired — please log in again.", "error");
+          showLoginPrompt();
+          return;
+        }
+        if (!response.ok) throw new Error("Server error");
         const data = await response.json();
         allRules = data.records || [];
         setStatus("", "");
+        showTable();
         renderRules(allRules);
       } catch (err) {
-        setStatus("Error fetching rules: " + err.message, "error");
+        setStatus("Error: " + err.message, "error");
       }
     }
 
@@ -166,7 +191,7 @@ router.get("/", (_req, res) => {
       }
     }
 
-    ${isLoggedIn ? "fetchRules();" : ""}
+    fetchRules();
   </script>
 </body>
 </html>`);
