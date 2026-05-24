@@ -1,5 +1,6 @@
 import { Router } from "express";
 import axios from "axios";
+import crypto from "node:crypto";
 
 const router = Router();
 
@@ -17,8 +18,17 @@ function getRedirectUri(req: { headers: { host?: string } }) {
   return `${proto}://${host}/api/callback`;
 }
 
+function generateCodeVerifier(): string {
+  return crypto.randomBytes(64).toString("base64url");
+}
+
+function generateCodeChallenge(verifier: string): string {
+  return crypto.createHash("sha256").update(verifier).digest("base64url");
+}
+
 let accessToken = "";
 let instanceUrl = "";
+let storedCodeVerifier = "";
 
 router.get("/", (_req, res) => {
   const isLoggedIn = !!accessToken;
@@ -164,10 +174,14 @@ router.get("/", (_req, res) => {
 
 router.get("/login", (req, res) => {
   const redirectUri = getRedirectUri(req);
+  storedCodeVerifier = generateCodeVerifier();
+  const codeChallenge = generateCodeChallenge(storedCodeVerifier);
   const authUrl =
     `${LOGIN_URL}?response_type=code` +
     `&client_id=${encodeURIComponent(CLIENT_ID)}` +
-    `&redirect_uri=${encodeURIComponent(redirectUri)}`;
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&code_challenge=${codeChallenge}` +
+    `&code_challenge_method=S256`;
   res.redirect(authUrl);
 });
 
@@ -186,6 +200,7 @@ router.get("/callback", async (req, res) => {
         client_secret: CLIENT_SECRET,
         redirect_uri: redirectUri,
         code,
+        code_verifier: storedCodeVerifier,
       },
     });
     accessToken = response.data.access_token;
