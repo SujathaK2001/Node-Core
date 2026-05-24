@@ -172,6 +172,20 @@ router.get("/", (_req, res) => {
 </html>`);
 });
 
+router.get("/debug", (req, res) => {
+  const redirectUri = getRedirectUri(req);
+  res.send(`
+    <h2>OAuth Debug Info</h2>
+    <p><strong>Callback URL (copy this exactly into Salesforce):</strong></p>
+    <code style="background:#f3f3f3;padding:8px 12px;display:block;border-radius:4px;word-break:break-all">${redirectUri}</code>
+    <br/>
+    <p><strong>Login URL base:</strong> <code>${LOGIN_URL}</code></p>
+    <p><strong>Client ID set:</strong> ${CLIENT_ID ? "✅ Yes" : "❌ Missing"}</p>
+    <p><strong>Client Secret set:</strong> ${CLIENT_SECRET ? "✅ Yes" : "❌ Missing"}</p>
+    <br/><p><a href="/api">Back</a></p>
+  `);
+});
+
 router.get("/login", (req, res) => {
   const redirectUri = getRedirectUri(req);
   storedCodeVerifier = generateCodeVerifier();
