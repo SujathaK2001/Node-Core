@@ -314,10 +314,15 @@ router.post("/toggleRule/:id", async (req, res) => {
   const { active } = req.body as { active: boolean };
   try {
     const url = `${instanceUrl}/services/data/v60.0/tooling/sobjects/ValidationRule/${id}`;
+    const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+
+    const getResponse = await axios.get(url, { headers });
+    const currentMetadata = getResponse.data.Metadata;
+
     await axios.patch(
       url,
-      { Active: active },
-      { headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" } }
+      { Metadata: { ...currentMetadata, active } },
+      { headers }
     );
     res.json({ success: true });
   } catch (error: unknown) {
