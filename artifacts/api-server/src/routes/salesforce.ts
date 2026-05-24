@@ -82,7 +82,9 @@ router.get("/", (_req, res) => {
     <div class="toolbar">
       <input type="text" id="objectFilter" placeholder="Filter by object (e.g. Account)" oninput="filterRules()" />
       <button onclick="fetchRules()">Refresh</button>
-      <button onclick="exportCSV()" style="background:#2e844a">Export CSV</button>
+      <button onclick="toggleAll(true)" style="background:#2e844a">Enable All</button>
+      <button onclick="toggleAll(false)" style="background:#c23934">Disable All</button>
+      <button onclick="exportCSV()" style="background:#0176d3">Export CSV</button>
       <button onclick="loginSalesforce()" style="background:#6c757d">Re-login</button>
     </div>
     <table>
@@ -173,6 +175,26 @@ router.get("/", (_req, res) => {
           </td>
         </tr>
       \`).join("");
+    }
+
+    async function toggleAll(active) {
+      if (!allRules.length) return;
+      const word = active ? "enable" : "disable";
+      if (!confirm(\`Are you sure you want to \${word} all \${allRules.length} rules?\`)) return;
+      setStatus(\`\${active ? "Enabling" : "Disabling"} all rules...\`, "info");
+      try {
+        const response = await fetch("/api/toggleAll", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ active })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Failed");
+        setStatus(\`All rules \${active ? "enabled" : "disabled"} successfully.\`, "info");
+        await fetchRules();
+      } catch (err) {
+        setStatus("Error: " + err.message, "error");
+      }
     }
 
     function exportCSV() {
@@ -354,6 +376,43 @@ router.post("/toggleRule/:id", async (req, res) => {
     const err = error as { response?: { data?: unknown }; message?: string };
     req.log.error({ err: err.response?.data || err.message }, "Error toggling rule");
     res.status(500).json({ error: "Failed to toggle rule", detail: err.response?.data });
+  }
+});
+
+router.post("/toggleAll", async (req, res) => {
+  if (!accessToken) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+  const { active } = req.body as { active: boolean };
+  try {
+    const query =
+      "SELECT Id, ValidationName, Active, ErrorMessage, EntityDefinitionId FROM ValidationRule ORDER BY ValidationName";
+    const url = `${instanceUrl}/services/data/v60.0/tooling/query/?q=${encodeURIComponent(query)}`;
+    const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+
+    const listResponse = await axios.get(url, { headers });
+    const rules: { Id: string }[] = listResponse.data.records ?? [];
+
+    const results = await Promise.allSettled(
+      rules.map(async (rule) => {
+        const ruleUrl = `${instanceUrl}/services/data/v60.0/tooling/sobjects/ValidationRule/${rule.Id}`;
+        const getRes = await axios.get(ruleUrl, { headers });
+        const currentMetadata = getRes.data.Metadata;
+        await axios.patch(ruleUrl, { Metadata: { ...currentMetadata, active } }, { headers });
+      })
+    );
+
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) {
+      res.status(207).json({ success: true, message: `${rules.length - failed} updated, ${failed} failed` });
+    } else {
+      res.json({ success: true, message: `All ${rules.length} rules ${active ? "enabled" : "disabled"}` });
+    }
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: unknown }; message?: string };
+    req.log.error({ err: err.response?.data || err.message }, "Error toggling all rules");
+    res.status(500).json({ error: "Failed to toggle all rules", detail: err.response?.data });
   }
 });
 
