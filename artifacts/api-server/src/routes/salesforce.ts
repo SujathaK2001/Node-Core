@@ -162,7 +162,7 @@ router.get("/", (_req, res) => {
       tbody.innerHTML = rules.map(rule => \`
         <tr id="row-\${rule.Id}">
           <td>\${rule.ValidationName}</td>
-          <td>\${rule.EntityDefinition?.QualifiedApiName || "—"}</td>
+          <td>\${rule.EntityDefinitionId || "—"}</td>
           <td><span class="badge \${rule.Active ? 'active' : 'inactive'}">\${rule.Active ? 'Active' : 'Inactive'}</span></td>
           <td>\${rule.ErrorMessage || "—"}</td>
           <td>
@@ -292,7 +292,7 @@ router.get("/validationRules", async (req, res) => {
   }
   try {
     const query =
-      "SELECT Id, ValidationName, Active, ErrorMessage, EntityDefinitionId, EntityDefinition.QualifiedApiName FROM ValidationRule ORDER BY EntityDefinition.QualifiedApiName, ValidationName";
+      "SELECT Id, ValidationName, Active, ErrorMessage, EntityDefinitionId FROM ValidationRule ORDER BY ValidationName";
     const url = `${instanceUrl}/services/data/v60.0/tooling/query/?q=${encodeURIComponent(query)}`;
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
