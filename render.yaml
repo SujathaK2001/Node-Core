@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: salesforce-validation-rules
+    runtime: node
+    buildCommand: npx pnpm@9 install --no-frozen-lockfile && npx pnpm@9 --filter @workspace/api-server run build
+    startCommand: node --enable-source-maps artifacts/api-server/dist/index.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
